@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+chess = "=3.2.0"
+eframe = "0.23"
+egui_extras = { version = "0.23", features = ["image", "svg"] }
+
+winapi = { version = "0.3", features = ["winuser", "windef"] }
