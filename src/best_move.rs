@@ -1,32 +1,36 @@
 use chess::{Board, BoardStatus, ChessMove, Color, MoveGen, Piece};
+use std::time::{Duration, Instant};
 
-pub fn best_move(has_pruning: bool, board: &Board, depth: u32, maximizing: bool, count: &mut i32, has_searched: &mut bool) -> (i32, Option<ChessMove>) {
-    
-    if *has_searched {
-        *count = 0;
-    }
+pub fn best_move(
+    has_pruning: bool,
+    board: &Board,
+    depth: u32,
+    maximizing: bool,
+    count: &mut i32,
+    time_elapsed: &mut Duration,
+) -> (i32, Option<ChessMove>) {
+    let result: (i32, Option<ChessMove>);
+    let now = Instant::now();
 
-    *has_searched = true;
+    *count = 0;
 
     if has_pruning {
-        minimax_alpha_beta(
-            board,
-            depth,
-            i32::MIN,
-            i32::MAX,
-            maximizing,
-            count
-        )
+        result = minimax_alpha_beta(board, depth, i32::MIN, i32::MAX, maximizing, count);
     } else {
-
         //TODO minimax without pruning
-        minimax(&board,
+        result = minimax(
+            &board,
             3,
             i32::MIN,
             i32::MAX,
             board.side_to_move() == Color::White,
-            count)
-    }  
+            count,
+        );
+    };
+
+    *time_elapsed = now.elapsed();
+
+    result
 }
 
 fn evaluate_board(board: &Board) -> i32 {
@@ -53,15 +57,15 @@ fn piece_value(piece: Piece) -> i32 {
     }
 }
 
-fn minimax( //TODO minimax without pruning
+fn minimax(
+    //TODO minimax without pruning
     board: &Board,
     depth: u32,
     alpha: i32,
     beta: i32,
     maximizing: bool,
-    count: &mut i32
+    count: &mut i32,
 ) -> (i32, Option<ChessMove>) {
-
     *count += 1;
 
     // ponto de parada da recursao:
@@ -121,9 +125,8 @@ fn minimax_alpha_beta(
     alpha: i32,
     beta: i32,
     maximizing: bool,
-    count: &mut i32
+    count: &mut i32,
 ) -> (i32, Option<ChessMove>) {
-
     *count += 1;
 
     // ponto de parada da recursao:

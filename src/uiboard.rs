@@ -2,6 +2,7 @@ use crate::best_move;
 use chess::{Board, Color};
 use eframe::egui;
 use eframe::egui::{Pos2, Rect, Vec2};
+use std::time::Duration;
 
 pub fn display_board(
     ui: &mut egui::Ui,
@@ -10,19 +11,19 @@ pub fn display_board(
     piece_images: Vec<egui::Image<'_>>,
     top_panel_height: f32,
     count: &mut i32,
-    has_searched: &mut bool,
-    depth: u32
+    depth: u32,
+    time_elapsed: &mut Duration,
 ) {
     let panel_size = ui.available_size();
 
     let board_size = panel_size.y * 0.8;
     let square_size = board_size / 8.0;
     let board_upperleft = Pos2::new(
-        ((panel_size.x - board_size) / 2.0) + 5.0,
+        ((panel_size.x - board_size) / 2.0) + 161.3,
         ((panel_size.y - board_size) / 2.0) + top_panel_height,
     );
-
     let board_rect = Rect::from_min_size(board_upperleft, Vec2::new(board_size, board_size));
+
     let rect = Rect::from_min_size(board_upperleft, Vec2::new(square_size, square_size));
 
     ui.put(board_rect, board_image);
@@ -46,7 +47,7 @@ pub fn display_board(
             depth,
             board.side_to_move() == Color::White,
             count,
-            has_searched
+            time_elapsed,
         );
 
         match best_move {
