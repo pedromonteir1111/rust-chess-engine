@@ -1,32 +1,61 @@
+use crate::best_move;
+use chess::{Board, Color};
 use eframe::egui;
+use eframe::egui::{Pos2, Rect, Vec2};
 
-pub fn display_board(ui: &mut egui::Ui) {
-
+pub fn display_board(
+    ui: &mut egui::Ui,
+    board: &Board,
+    board_image: egui::Image<'_>,
+    piece_images: Vec<egui::Image<'_>>,
+    top_panel_height: f32,
+    count: &mut i32,
+    has_searched: &mut bool,
+    depth: u32
+) {
     let panel_size = ui.available_size();
 
-    let light_square_color = egui::Color32::from_rgb(234, 178, 160);
-    let dark_square_color = egui::Color32::from_rgb(167, 111, 111);
-    let board_size = panel_size.y * 0.9;
+    let board_size = panel_size.y * 0.8;
     let square_size = board_size / 8.0;
+    let board_upperleft = Pos2::new(
+        ((panel_size.x - board_size) / 2.0) + 5.0,
+        ((panel_size.y - board_size) / 2.0) + top_panel_height,
+    );
 
-    //let mut rects: [[egui::Rect; 8]; 8];
-    
-    egui::Grid::new("chess_board")
-        .spacing([0.0, 0.0])
-        .show(ui, |ui| {
-            for row in 0..8 {
-                for col in 0..8 {
-                    
-                    let is_light_square = (row + col) % 2 == 0;
-                    let square_color = if is_light_square { light_square_color } else { dark_square_color };
+    let board_rect = Rect::from_min_size(board_upperleft, Vec2::new(board_size, board_size));
+    let rect = Rect::from_min_size(board_upperleft, Vec2::new(square_size, square_size));
 
-                    let (rect, _) = ui.allocate_exact_size(
-                        egui::vec2(square_size, square_size),
-                        egui::Sense::click(),
-                    );
-                    ui.painter().rect_filled(rect, 0.0, square_color);
-                }
-                ui.end_row();
-            }
-        });
+    ui.put(board_rect, board_image);
+    ui.put(rect, piece_images[0].clone());
+
+    let response = ui.interact(
+        board_rect,
+        ui.make_persistent_id("board_rect"),
+        egui::Sense::click(),
+    );
+    let response2 = ui.interact(
+        rect,
+        ui.make_persistent_id("board_rect"),
+        egui::Sense::click(),
+    );
+
+    if response.clicked() {
+        let (_, best_move) = best_move::best_move(
+            true,
+            board,
+            depth,
+            board.side_to_move() == Color::White,
+            count,
+            has_searched
+        );
+
+        match best_move {
+            Some(best_move) => println!("{}", best_move),
+            None => (),
+        }
+    }
+
+    if response2.clicked() {
+        println!("clicou2");
+    }
 }
