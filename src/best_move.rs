@@ -2,7 +2,7 @@ use chess::{Board, BoardStatus, ChessMove, Color, MoveGen, Piece};
 use std::time::{Duration, Instant};
 
 pub fn best_move(
-    has_pruning: bool,
+    has_pruning: &bool,
     board: &Board,
     depth: u32,
     maximizing: bool,
@@ -14,16 +14,20 @@ pub fn best_move(
 
     *count = 0;
 
-    if has_pruning {
-        result = minimax_alpha_beta(board, depth, i32::MIN, i32::MAX, maximizing, count);
+    if *has_pruning {
+        result = minimax_alpha_beta(
+            board,
+            depth,
+            i32::MIN,
+            i32::MAX,
+            maximizing,
+            count);
     } else {
         //TODO minimax without pruning
         result = minimax(
-            &board,
-            3,
-            i32::MIN,
-            i32::MAX,
-            board.side_to_move() == Color::White,
+            board,
+            depth,
+            maximizing,
             count,
         );
     };
@@ -33,7 +37,7 @@ pub fn best_move(
     result
 }
 
-fn evaluate_board(board: &Board) -> i32 {
+pub fn evaluate_board(board: &Board) -> i32 {
     let mut result = 0;
 
     for square in *board.color_combined(Color::White) {
@@ -58,11 +62,8 @@ fn piece_value(piece: Piece) -> i32 {
 }
 
 fn minimax(
-    //TODO minimax without pruning
     board: &Board,
     depth: u32,
-    alpha: i32,
-    beta: i32,
     maximizing: bool,
     count: &mut i32,
 ) -> (i32, Option<ChessMove>) {
@@ -75,20 +76,13 @@ fn minimax(
         return (evaluate_board(board), None);
     }
 
-    // representa o maior resultado encontrado naquele caminho
-    // o valor inicial eh o menor possivel, pois nenhum valor foi procurado ainda
-    let mut alpha = alpha;
-
-    // representa o menor resultado encontrado naquele caminho
-    // o valor inicial eh o maior possivel, pois nenhum valor foi procurado ainda
-    let mut beta = beta;
     let mut best_move = None;
     let mut best_score = if maximizing { i32::MIN } else { i32::MAX };
 
     // itera por todos os movimentos legais no estado do tabuleiro atual
     for mv in MoveGen::new_legal(board) {
         let new_board = board.make_move_new(mv); //tabuleiro que representa um possivel movimento
-        let (score, _) = minimax_alpha_beta(&new_board, depth - 1, alpha, beta, !maximizing, count);
+        let (score, _) = minimax(&new_board, depth - 1, !maximizing, count);
 
         //se for a vez das brancas:
         if maximizing {
@@ -96,23 +90,12 @@ fn minimax(
                 best_score = score;
                 best_move = Some(mv);
             }
-
-            //se o score for o maior encontrado ate agr:
-            alpha = alpha.max(score);
         } else {
             //se for a vez das pretas:
             if score < best_score {
                 best_score = score;
                 best_move = Some(mv);
             }
-
-            //se o score for o menor encontrado ate agora
-            beta = beta.min(score);
-        }
-
-        //se beta for maior que alpha significa q um caminho mais favoravel ja foi garantido, ent nao precisa continuar o for loop
-        if beta <= alpha {
-            break;
         }
     }
 

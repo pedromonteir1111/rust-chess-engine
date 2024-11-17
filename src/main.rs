@@ -1,9 +1,9 @@
-use chess::{Board, ChessMove, Square};
-use eframe::egui;
-use eframe::egui::{FontId, RichText};
+use chess::Board;
+use eframe::egui::{self, FontId, RichText, Color32};
 use egui_extras;
 use std::ops::RangeInclusive;
 use std::time::Duration;
+use thousands::Separable;
 mod best_move;
 mod uiboard;
 
@@ -34,6 +34,7 @@ struct ChessApp {
     count: i32,
     depth: u32,
     time_elapsed: Duration,
+    pruning: bool
 }
 
 impl Default for ChessApp {
@@ -42,7 +43,8 @@ impl Default for ChessApp {
             board: Board::default(),
             count: 0,
             depth: 3,
-            time_elapsed: Duration::from_secs(0),
+            time_elapsed: Duration::ZERO,
+            pruning: true
         }
     }
 }
@@ -70,7 +72,7 @@ impl eframe::App for ChessApp {
         let image = egui::Image::new(egui::include_image!("assets/chess_board.png"));
 
         let top_panel_height = 100.0;
-        let left_panel_width = 150.0;
+        let left_panel_width = 180.0;
 
         egui::SidePanel::left("left_panel")
             .resizable(false)
@@ -81,6 +83,7 @@ impl eframe::App for ChessApp {
             })
             .show(ctx, |ui| {
                 ui.label(RichText::new(format!("settings:")).font(FontId::proportional(35.0)));
+
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("depth:").font(FontId::proportional(25.0)));
                     ui.add(
@@ -88,7 +91,18 @@ impl eframe::App for ChessApp {
                             .speed(0.05)
                             .clamp_range(RangeInclusive::new(1, 7)),
                     );
-                })
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("alpha-beta:").font(FontId::proportional(25.0)));
+                    toggle_ui(ui, &mut self.pruning);
+                });
+
+                if ui.button("Reset").clicked() {
+                    self.board = Board::default();
+                    self.time_elapsed = Duration::ZERO;
+                    self.count = 0;
+                };
             });
 
         egui::TopBottomPanel::top("top_panel")
@@ -100,7 +114,7 @@ impl eframe::App for ChessApp {
                     ui.label(
                         RichText::new(format!(
                             "\n{} nodes searched in {}.{} seconds",
-                            self.count,
+                            self.count.separate_with_commas(),
                             self.time_elapsed.as_secs(),
                             self.time_elapsed.subsec_millis()
                         ))
@@ -112,6 +126,7 @@ impl eframe::App for ChessApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             let squares = self.display_board(
                 ui,
+                ctx,
                 image,
                 top_panel_height
             );
@@ -123,4 +138,45 @@ impl eframe::App for ChessApp {
             );
         });
     }
+}
+
+// taken from egui widget demos:
+fn toggle_ui(ui: &mut egui::Ui, on: &mut bool) -> egui::Response {
+    let desired_size = ui.spacing().interact_size.y * egui::vec2(2.0, 1.0);
+    let (rect, mut response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
+    if response.clicked() {
+        *on = !*on;
+        response.mark_changed();
+    }
+    response.widget_info(|| {
+        egui::WidgetInfo::selected(egui::WidgetType::Checkbox, ui.is_enabled(), "")
+    });
+
+    if ui.is_rect_visible(rect) {
+        let how_on = ui.ctx().animate_bool(response.id, *on);
+        let visuals = ui.style().interact_selectable(&response, *on);
+        let rect = rect.expand(visuals.expansion);
+        let radius = 0.5 * rect.height();
+
+        // custom coloring
+        let bg_color = if *on {
+            Color32::from_rgb(100, 200, 100)
+        } else {
+            visuals.bg_fill
+        };
+        let circle_color = if *on {
+            Color32::WHITE 
+        } else {
+            visuals.bg_fill
+        };
+
+        ui.painter()
+            .rect(rect, radius, bg_color, visuals.bg_stroke);
+        let circle_x = egui::lerp((rect.left() + radius)..=(rect.right() - radius), how_on);
+        let center = egui::pos2(circle_x, rect.center().y);
+        ui.painter()
+            .circle(center, 0.75 * radius, circle_color, visuals.fg_stroke);
+    }
+
+    response
 }

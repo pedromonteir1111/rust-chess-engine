@@ -1,8 +1,7 @@
 use crate::best_move;
 use super::ChessApp;
 use chess::{BitBoard, Color, Piece};
-use eframe::egui;
-use eframe::egui::{Pos2, Rect, Vec2};
+use eframe::egui::{self, Pos2, Rect, Vec2, Color32};
 
 // bloco de implementacao para mostrar o tabuleiro
 
@@ -10,6 +9,7 @@ impl ChessApp {
     pub fn display_board (
         &mut self,
         ui: &mut egui::Ui,
+        ctx: &egui::Context,
         board_image: egui::Image<'_>,
         top_panel_height: f32,
     ) -> [[Rect; 8]; 8]  {
@@ -18,7 +18,7 @@ impl ChessApp {
         let board_size = panel_size.y * 0.8;
         let square_size = board_size / 8.0;
         let board_upperleft = Pos2::new(
-            ((panel_size.x - board_size) / 2.0) + 161.3,
+            ((panel_size.x - board_size) / 2.0) + 171.3,
             ((panel_size.y - board_size) / 2.0) + top_panel_height,
         );
         let board_rect = Rect::from_min_size(board_upperleft, Vec2::new(board_size, board_size));
@@ -45,7 +45,7 @@ impl ChessApp {
     
         if response.clicked() {
             let (_, best_move) = best_move::best_move(
-                true,
+                &self.pruning,
                 &self.board,
                 self.depth,
                 self.board.side_to_move() == Color::White,
@@ -63,6 +63,8 @@ impl ChessApp {
             Some((x, y)) => println!("o quadrado ({},{}) foi clicado", x, y),
             None => ()
         }
+
+        self.draw_evaluation_bar(ctx, ui, Pos2::new(board_upperleft.x + board_size + 5.0, board_upperleft.y), Vec2::new(30.0, board_size));
 
         squares
     }
@@ -99,6 +101,32 @@ impl ChessApp {
                     } 
                 }
             }           
+        }
+    }
+
+    pub fn draw_evaluation_bar(&self, ctx: &egui::Context, ui: &mut egui::Ui, position: Pos2, size: Vec2) {
+       
+        let evaluation = best_move::evaluate_board(&self.board);
+
+        let max_eval = 20;
+        let min_eval = -20;
+        let eval_clamped = evaluation.clamp(min_eval, max_eval) as f32;
+        let eval_percent = (eval_clamped - min_eval as f32) / (max_eval - min_eval) as f32;
+        let rect = Rect::from_min_size(position, size);
+        let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("evaluation_bar")));
+    
+        let mid_y = rect.bottom() - (rect.height() * eval_percent as f32);
+    
+        painter.rect_filled(rect, 0.0, Color32::BLACK);
+        painter.rect_filled(Rect::from_min_max(Pos2::new(rect.left(), mid_y), rect.max), 0.0, Color32::WHITE);
+    
+        let response = ui.interact(rect, egui::Id::new("evaluation_bar_interaction"), egui::Sense::hover());
+
+    
+        if response.hovered() {
+            egui::show_tooltip(ctx, response.id, |ui| {
+                ui.label(format!("Evaluation: {:.2}", evaluation));
+            });
         }
     }
 
