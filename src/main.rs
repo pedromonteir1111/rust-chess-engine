@@ -1,4 +1,4 @@
-use chess::Board;
+use chess::{Board, ChessMove, Square};
 use eframe::egui;
 use eframe::egui::{FontId, RichText};
 use egui_extras;
@@ -50,6 +50,25 @@ impl Default for ChessApp {
 impl eframe::App for ChessApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
 
+        let mut pieces: Vec<egui::Image<'_>> = Vec::new();
+        
+        {   // ugly code
+            pieces.push(egui::Image::new(egui::include_image!("assets/tile005.png")));
+            pieces.push(egui::Image::new(egui::include_image!("assets/tile011.png")));
+            pieces.push(egui::Image::new(egui::include_image!("assets/tile002.png")));
+            pieces.push(egui::Image::new(egui::include_image!("assets/tile008.png")));
+            pieces.push(egui::Image::new(egui::include_image!("assets/tile003.png")));
+            pieces.push(egui::Image::new(egui::include_image!("assets/tile009.png")));
+            pieces.push(egui::Image::new(egui::include_image!("assets/tile004.png")));
+            pieces.push(egui::Image::new(egui::include_image!("assets/tile010.png")));
+            pieces.push(egui::Image::new(egui::include_image!("assets/tile001.png")));
+            pieces.push(egui::Image::new(egui::include_image!("assets/tile007.png")));
+            pieces.push(egui::Image::new(egui::include_image!("assets/tile000.png")));
+            pieces.push(egui::Image::new(egui::include_image!("assets/tile006.png")));
+        }
+        
+        let image = egui::Image::new(egui::include_image!("assets/chess_board.png"));
+
         let top_panel_height = 100.0;
         let left_panel_width = 150.0;
 
@@ -77,36 +96,30 @@ impl eframe::App for ChessApp {
             .min_height(top_panel_height)
             .show_separator_line(false)
             .show(ctx, |ui| {
-                ui.with_layout(
-                    egui::Layout::centered_and_justified(egui::Direction::BottomUp),
-                    |ui| {
-                        ui.label(
-                            RichText::new(format!(
-                                "{} nodes searched in {}.{} seconds",
-                                self.count,
-                                self.time_elapsed.as_secs(),
-                                self.time_elapsed.subsec_millis()
-                            ))
-                            .font(FontId::proportional(35.0)),
-                        );
-                    },
-                );
+                ui.vertical_centered( |ui| {
+                    ui.label(
+                        RichText::new(format!(
+                            "\n{} nodes searched in {}.{} seconds",
+                            self.count,
+                            self.time_elapsed.as_secs(),
+                            self.time_elapsed.subsec_millis()
+                        ))
+                        .font(FontId::proportional(35.0)),
+                    );
+                });
             });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            let mut pieces: Vec<egui::Image<'_>> = Vec::new();
-            pieces.push(egui::Image::new(egui::include_image!("assets/147065.svg")));
-            let image = egui::Image::new(egui::include_image!("assets/chess_board.png"));
-
-            uiboard::display_board(
+            let squares = self.display_board(
                 ui,
-                &self.board,
                 image,
-                pieces,
-                top_panel_height,
-                &mut self.count,
-                self.depth,
-                &mut self.time_elapsed,
+                top_panel_height
+            );
+
+            self.display_pieces(
+                ui,
+                &pieces,
+                &squares
             );
         });
     }
