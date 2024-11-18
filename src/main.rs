@@ -1,14 +1,18 @@
-use chess::Board;
+mod best_move;
+mod uiboard;
+mod action_manager;
+use chess::{Board, ChessMove, Color, Square};
 use eframe::egui::{self, FontId, RichText, Color32};
 use egui_extras;
 use std::ops::RangeInclusive;
 use std::time::Duration;
 use thousands::Separable;
-mod best_move;
-mod uiboard;
+use action_manager::TurnStates;
+
 
 fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
+        initial_window_size: Some(egui::Vec2::new(900.0, 650.0)),
         min_window_size: Some(egui::Vec2::new(600.0, 400.0)),
         ..Default::default()
     };
@@ -18,9 +22,9 @@ fn main() -> Result<(), eframe::Error> {
         options,
         Box::new(|cc| {
             cc.egui_ctx.set_visuals(egui::Visuals {
-                window_fill: egui::Color32::from_rgb(92, 84, 112),
-                panel_fill: egui::Color32::from_rgb(92, 84, 112), 
-                override_text_color: Some(egui::Color32::from_rgb(185, 180, 199)),
+                window_fill: Color32::from_rgb(92, 84, 112),
+                panel_fill: Color32::from_rgb(92, 84, 112), 
+                override_text_color: Some(Color32::from_rgb(185, 180, 199)),
                 ..Default::default()
             });
             egui_extras::install_image_loaders(&cc.egui_ctx);
@@ -34,7 +38,12 @@ struct ChessApp {
     count: i32,
     depth: u32,
     time_elapsed: Duration,
-    pruning: bool
+    pruning: bool,
+    game_is_over: bool,
+    turn_state: TurnStates,
+    source_square: Option<Square>,
+    legal_moves_from_source: Vec<ChessMove>,
+    winner: Option<Color>
 }
 
 impl Default for ChessApp {
@@ -44,7 +53,12 @@ impl Default for ChessApp {
             count: 0,
             depth: 3,
             time_elapsed: Duration::ZERO,
-            pruning: true
+            pruning: true,
+            game_is_over: false,
+            turn_state: TurnStates::PieceSelection,
+            source_square: None,
+            legal_moves_from_source: Vec::new(),
+            winner: None
         }
     }
 }
@@ -78,11 +92,13 @@ impl eframe::App for ChessApp {
             .resizable(false)
             .exact_width(left_panel_width)
             .frame(egui::containers::Frame {
-                fill: egui::Color32::from_rgb(92, 84, 112),
+                fill: Color32::from_rgb(92, 84, 112),
                 ..Default::default()
             })
             .show(ctx, |ui| {
                 ui.label(RichText::new(format!("settings:")).font(FontId::proportional(35.0)));
+
+                ui.label(RichText::new("").font(FontId::proportional(2.0)));
 
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("depth:").font(FontId::proportional(25.0)));
@@ -98,11 +114,20 @@ impl eframe::App for ChessApp {
                     toggle_ui(ui, &mut self.pruning);
                 });
 
-                if ui.button("Reset").clicked() {
-                    self.board = Board::default();
-                    self.time_elapsed = Duration::ZERO;
-                    self.count = 0;
-                };
+                ui.label(RichText::new("").font(FontId::proportional(5.0)));
+
+                ui.vertical_centered(|ui| {
+                    if ui.button("Reset").clicked() {
+                        self.board = Board::default();
+                        self.time_elapsed = Duration::ZERO;
+                        self.count = 0;
+                        self.turn_state = TurnStates::PieceSelection;
+                        self.source_square = None;
+                        self.legal_moves_from_source = Vec::new();
+                        self.game_is_over = false;
+                        self.winner = None;
+                    };
+                });               
             });
 
         egui::TopBottomPanel::top("top_panel")
@@ -112,19 +137,31 @@ impl eframe::App for ChessApp {
             .show(ctx, |ui| {
                 ui.vertical_centered( |ui| {
                     ui.label(
-                        RichText::new(format!(
-                            "\n{} nodes searched in {}.{} seconds",
-                            self.count.separate_with_commas(),
-                            self.time_elapsed.as_secs(),
-                            self.time_elapsed.subsec_millis()
-                        ))
+                        if !self.game_is_over{
+                                RichText::new(format!(
+                                    "\n{} nodes searched in {}.{} seconds",
+                                    self.count.separate_with_commas(),
+                                    self.time_elapsed.as_secs(),
+                                    self.time_elapsed.subsec_millis()
+                                ))
+                            } else if self.game_is_over && self.winner == None{
+                                RichText::new(format!(
+                                    "\nit's a draw!",
+                                ))
+                            } else {
+                                RichText::new(format!(
+                                    "\n{:#?} won!",
+                                    self.winner.unwrap(),
+                                ))
+                            }
+                        
                         .font(FontId::proportional(35.0)),
                     );
                 });
             });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            let squares = self.display_board(
+            let squares: [[egui::Rect; 8]; 8] = self.display_board(
                 ui,
                 ctx,
                 image,
@@ -136,6 +173,8 @@ impl eframe::App for ChessApp {
                 &pieces,
                 &squares
             );
+
+            self.action_manager(ui, &squares);
         });
     }
 }

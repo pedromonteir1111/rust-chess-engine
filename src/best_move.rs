@@ -23,7 +23,6 @@ pub fn best_move(
             maximizing,
             count);
     } else {
-        //TODO minimax without pruning
         result = minimax(
             board,
             depth,

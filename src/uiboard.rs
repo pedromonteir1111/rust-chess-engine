@@ -36,33 +36,6 @@ impl ChessApp {
         }        
 
         ui.put(board_rect, board_image);
-    
-        let response = ui.interact(
-            board_rect,
-            ui.make_persistent_id("board_rect"),
-            egui::Sense::click(),
-        );
-    
-        if response.clicked() {
-            let (_, best_move) = best_move::best_move(
-                &self.pruning,
-                &self.board,
-                self.depth,
-                self.board.side_to_move() == Color::White,
-                &mut self.count,
-                &mut self.time_elapsed,
-            );
-    
-            match best_move {
-                Some(best_move) => self.board = self.board.make_move_new(best_move),
-                None => (),
-            }
-        }
-
-        match ChessApp:: detect_clicked_square(ui, &squares){
-            Some((x, y)) => println!("o quadrado ({},{}) foi clicado", x, y),
-            None => ()
-        }
 
         self.draw_evaluation_bar(ctx, ui, Pos2::new(board_upperleft.x + board_size + 5.0, board_upperleft.y), Vec2::new(30.0, board_size));
 
@@ -97,7 +70,7 @@ impl ChessApp {
                     let bit = (bitboard.0 >> square_index) & 1;
                     
                     if bit == 1 {
-                        ui.put(squares[rank][file], piece_images[ChessApp::piece_to_index(&bb_type)].clone());
+                        ui.put(squares[rank][file], piece_images[piece_to_index(&bb_type)].clone());
                     } 
                 }
             }           
@@ -130,42 +103,43 @@ impl ChessApp {
         }
     }
 
-    fn detect_clicked_square(ui: &mut egui::Ui, squares: &[[Rect; 8]; 8]) -> Option<(usize, usize)> {
+}
 
-        let mouse_pos = match ui.input(|i| i.pointer.interact_pos()) {
-            Some(pos) => pos,
-            None => Pos2::ZERO
-        };
+pub fn detect_clicked_square(ui: &mut egui::Ui, squares: &[[Rect; 8]; 8]) -> Option<(usize, usize)> {
 
-        if ui.input(|i| i.pointer.primary_pressed()) {
-            for row in 0..8 {
-                for col in 0..8 {
-                    let rect = squares[row][col];
-                    
-                    if rect.contains(mouse_pos) {
-                        return Some((row, col));
-                    }
+    let mouse_pos = match ui.input(|i| i.pointer.interact_pos()) {
+        Some(pos) => pos,
+        None => Pos2::ZERO
+    };
+
+    if ui.input(|i| i.pointer.primary_pressed()) {
+        for row in 0..8 {
+            for col in 0..8 {
+                let rect = squares[row][col];
+                
+                if rect.contains(mouse_pos) {
+                    return Some((7 - row, col));
                 }
             }
         }
-        None
     }
+    None
+}
 
-    fn piece_to_index(bb_type: &PiecesAndColors) -> usize {
-        match bb_type {
-            PiecesAndColors::WhitePawn => 0,
-            PiecesAndColors::BlackPawn => 1,
-            PiecesAndColors::WhiteBishop => 2,
-            PiecesAndColors::BlackBishop => 3,
-            PiecesAndColors::WhiteKnight => 4,
-            PiecesAndColors::BlackKnight => 5,
-            PiecesAndColors::WhiteRook => 6,
-            PiecesAndColors::BlackRook => 7,
-            PiecesAndColors::WhiteQueen => 8,
-            PiecesAndColors::BlackQueen => 9,
-            PiecesAndColors::WhiteKing => 10,
-            PiecesAndColors::BlackKing => 11,
-        }
+fn piece_to_index(bb_type: &PiecesAndColors) -> usize {
+    match bb_type {
+        PiecesAndColors::WhitePawn => 0,
+        PiecesAndColors::BlackPawn => 1,
+        PiecesAndColors::WhiteBishop => 2,
+        PiecesAndColors::BlackBishop => 3,
+        PiecesAndColors::WhiteKnight => 4,
+        PiecesAndColors::BlackKnight => 5,
+        PiecesAndColors::WhiteRook => 6,
+        PiecesAndColors::BlackRook => 7,
+        PiecesAndColors::WhiteQueen => 8,
+        PiecesAndColors::BlackQueen => 9,
+        PiecesAndColors::WhiteKing => 10,
+        PiecesAndColors::BlackKing => 11,
     }
 }
 
