@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use chess::{BoardStatus, ChessMove, Color, File, MoveGen, Piece, Rank, Square};
 use eframe::egui;
 use super::ChessApp;
@@ -51,16 +53,7 @@ impl ChessApp {
                 None => ()
             }
         } else if self.board.status() == BoardStatus::Checkmate {
-            self.turn_state = TurnStates::Checkmate;
-
-            let checkmated_player = self.board.side_to_move();
-            self.winner = Some(
-                if checkmated_player == Color::White {
-                    Color::Black
-                } else {
-                    Color::White
-                }
-            );
+            self.checkmate();
         } else {
             self.turn_state = TurnStates::Stalemate;
     }
@@ -92,6 +85,13 @@ impl ChessApp {
                     }
 
                     if self.legal_moves_from_source.contains(&possible_move) {
+                        
+                        if self.board.piece_on(clicked_square).is_some(){
+                            self.black_slain_pieces.push(self.board.piece_on(clicked_square).unwrap());
+                        } 
+
+                        println!("dead white: {:#?}\ndead black: {:#?}", self.white_slain_pieces, self.black_slain_pieces);
+
                         self.board = self.board.make_move_new(possible_move);
                         self.turn_state = TurnStates::OpponentMoves;
                     } else {
@@ -113,16 +113,7 @@ impl ChessApp {
                 None => ()
             }  
         } else if self.board.status() == BoardStatus::Checkmate {
-            self.turn_state = TurnStates::Checkmate;
-
-            let checkmated_player = self.board.side_to_move();
-            self.winner = Some(
-                if checkmated_player == Color::White {
-                    Color::Black
-                } else {
-                    Color::White
-                }
-            );
+            self.checkmate();
         } else {
             self.turn_state = TurnStates::Stalemate;
         }
@@ -142,7 +133,14 @@ impl ChessApp {
             );
     
             match best_move {
-                Some(best_move) => self.board = self.board.make_move_new(best_move),
+                Some(best_move) => {
+                    
+                    if self.board.piece_on(best_move.get_dest()).is_some() {
+                        self.white_slain_pieces.push(self.board.piece_on(best_move.get_dest()).unwrap());
+                    }
+                    
+                    self.board = self.board.make_move_new(best_move);   
+                },
                 None => (),
             }
     
@@ -151,20 +149,36 @@ impl ChessApp {
             self.legal_moves_from_source = Vec::new();
 
         } else if self.board.status() == BoardStatus::Checkmate {
-            self.turn_state = TurnStates::Checkmate;
-
-            let checkmated_player = self.board.side_to_move();
-            self.winner = Some(
-                if checkmated_player == Color::White {
-                    Color::Black
-                } else {
-                    Color::White
-                }
-            );
+            self.checkmate();
         } else {
             self.turn_state = TurnStates::Stalemate;
         }
      
+    }
+
+    fn checkmate(&mut self) {
+        self.turn_state = TurnStates::Checkmate;
+
+        let checkmated_player = self.board.side_to_move();
+        self.winner = Some(
+            if checkmated_player == Color::White {
+                Color::Black
+            } else {
+                Color::White
+            }
+        );
+
+        self.reset_info();
+    }
+
+    pub fn reset_info(&mut self) {
+        self.time_elapsed = Duration::ZERO;
+        self.count = 0;
+        self.source_square = None;
+        self.legal_moves_from_source = Vec::new();
+        self.white_slain_pieces = Vec::new();
+        self.black_slain_pieces = Vec::new();
+
     }
 }
 

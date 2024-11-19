@@ -1,7 +1,8 @@
 mod best_move;
 mod uiboard;
 mod action_manager;
-use chess::{Board, ChessMove, Color, Square};
+mod piece_square_tables;
+use chess::{Board, ChessMove, Color, Piece, Square};
 use eframe::egui::{self, FontId, RichText, Color32};
 use egui_extras;
 use std::ops::RangeInclusive;
@@ -35,12 +36,14 @@ fn main() -> Result<(), eframe::Error> {
 
 struct ChessApp {
     board: Board,
-    count: i32,
+    count: i64,
     depth: u32,
     time_elapsed: Duration,
     pruning: bool,
     game_is_over: bool,
     turn_state: TurnStates,
+    white_slain_pieces: Vec<Piece>,
+    black_slain_pieces: Vec<Piece>,
     source_square: Option<Square>,
     legal_moves_from_source: Vec<ChessMove>,
     winner: Option<Color>
@@ -56,6 +59,8 @@ impl Default for ChessApp {
             pruning: true,
             game_is_over: false,
             turn_state: TurnStates::PieceSelection,
+            white_slain_pieces: Vec::new(),
+            black_slain_pieces: Vec::new(),
             source_square: None,
             legal_moves_from_source: Vec::new(),
             winner: None
@@ -67,8 +72,9 @@ impl eframe::App for ChessApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
 
         let mut pieces: Vec<egui::Image<'_>> = Vec::new();
+        let mut icons: Vec<egui::Image<'_>> = Vec::new();
         
-        {   // ugly code
+        {   // ugly image importing
             pieces.push(egui::Image::new(egui::include_image!("assets/tile005.png")));
             pieces.push(egui::Image::new(egui::include_image!("assets/tile011.png")));
             pieces.push(egui::Image::new(egui::include_image!("assets/tile002.png")));
@@ -81,6 +87,9 @@ impl eframe::App for ChessApp {
             pieces.push(egui::Image::new(egui::include_image!("assets/tile007.png")));
             pieces.push(egui::Image::new(egui::include_image!("assets/tile000.png")));
             pieces.push(egui::Image::new(egui::include_image!("assets/tile006.png")));
+
+            icons.push(egui::Image::new(egui::include_image!("assets/dot.png")));
+            icons.push(egui::Image::new(egui::include_image!("assets/x.png")));
         }
         
         let image = egui::Image::new(egui::include_image!("assets/chess_board.png"));
@@ -119,13 +128,10 @@ impl eframe::App for ChessApp {
                 ui.vertical_centered(|ui| {
                     if ui.button("Reset").clicked() {
                         self.board = Board::default();
-                        self.time_elapsed = Duration::ZERO;
-                        self.count = 0;
-                        self.turn_state = TurnStates::PieceSelection;
-                        self.source_square = None;
-                        self.legal_moves_from_source = Vec::new();
+                        self.reset_info();
                         self.game_is_over = false;
                         self.winner = None;
+                        self.turn_state = TurnStates::PieceSelection;
                     };
                 });               
             });
@@ -161,7 +167,7 @@ impl eframe::App for ChessApp {
             });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            let squares: [[egui::Rect; 8]; 8] = self.display_board(
+            let tiles: [[egui::Rect; 8]; 8] = self.display_board(
                 ui,
                 ctx,
                 image,
@@ -171,10 +177,15 @@ impl eframe::App for ChessApp {
             self.display_pieces(
                 ui,
                 &pieces,
-                &squares
+                &tiles
             );
 
-            self.action_manager(ui, &squares);
+            self.display_possible_actions(ui,
+                &tiles,
+                &icons);
+
+            self.action_manager(ui, &tiles);
+            
         });
     }
 }

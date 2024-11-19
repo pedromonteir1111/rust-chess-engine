@@ -1,7 +1,22 @@
-use crate::best_move;
+use crate::{action_manager::TurnStates, best_move};
 use super::ChessApp;
 use chess::{BitBoard, Color, Piece};
 use eframe::egui::{self, Pos2, Rect, Vec2, Color32};
+
+enum PiecesAndColors {
+    WhitePawn,
+    WhiteBishop,
+    WhiteKnight,
+    WhiteRook,
+    WhiteQueen,
+    WhiteKing,
+    BlackPawn,
+    BlackBishop,
+    BlackKnight,
+    BlackRook,
+    BlackQueen,
+    BlackKing
+}
 
 // bloco de implementacao para mostrar o tabuleiro
 
@@ -23,11 +38,11 @@ impl ChessApp {
         );
         let board_rect = Rect::from_min_size(board_upperleft, Vec2::new(board_size, board_size));
     
-        let mut squares: [[Rect ; 8] ; 8] = [[Rect::NOTHING ; 8] ; 8];
+        let mut tiles: [[Rect ; 8] ; 8] = [[Rect::NOTHING ; 8] ; 8];
         
         for row in 0..8 {
             for col in 0..8 {
-                squares[row][col] = Rect::from_min_size(
+                tiles[row][col] = Rect::from_min_size(
                     Pos2::new(
                         board_upperleft.x + square_size * col as f32,
                         board_upperleft.y + square_size * row as f32),
@@ -39,14 +54,14 @@ impl ChessApp {
 
         self.draw_evaluation_bar(ctx, ui, Pos2::new(board_upperleft.x + board_size + 5.0, board_upperleft.y), Vec2::new(30.0, board_size));
 
-        squares
+        tiles
     }
 
     pub fn display_pieces(
         &self, 
         ui: &mut egui::Ui,
         piece_images: &Vec<egui::Image<'_>>,
-        squares: &[[Rect; 8]; 8]) {
+        tiles: &[[Rect; 8]; 8]) {
         
         let bitboards: [(BitBoard, PiecesAndColors) ; 12] = [
             (self.board.pieces(Piece::Pawn).clone() & self.board.color_combined(Color::White), PiecesAndColors::WhitePawn),
@@ -70,7 +85,7 @@ impl ChessApp {
                     let bit = (bitboard.0 >> square_index) & 1;
                     
                     if bit == 1 {
-                        ui.put(squares[rank][file], piece_images[piece_to_index(&bb_type)].clone());
+                        ui.put(tiles[rank][file], piece_images[piece_to_index(&bb_type)].clone());
                     } 
                 }
             }           
@@ -81,13 +96,13 @@ impl ChessApp {
        
         let evaluation = best_move::evaluate_board(&self.board);
 
-        let max_eval = 20;
-        let min_eval = -20;
-        let eval_clamped = evaluation.clamp(min_eval, max_eval) as f32;
+        let max_eval = 3000;
+        let min_eval = -3000;
+        let eval_clamped = if !matches!(self.turn_state, TurnStates::Checkmate) {evaluation.clamp(min_eval, max_eval) as f32} else {max_eval as f32};
         let eval_percent = (eval_clamped - min_eval as f32) / (max_eval - min_eval) as f32;
         let rect = Rect::from_min_size(position, size);
         let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("evaluation_bar")));
-    
+
         let mid_y = rect.bottom() - (rect.height() * eval_percent as f32);
     
         painter.rect_filled(rect, 0.0, Color32::BLACK);
@@ -103,9 +118,26 @@ impl ChessApp {
         }
     }
 
+    pub fn display_possible_actions(&mut self, ui: &mut egui::Ui, tiles: &[[Rect; 8]; 8], icons: &Vec<egui::Image<'_>>) {
+        if !self.legal_moves_from_source.is_empty() {
+            for mv in self.legal_moves_from_source.clone() {
+                let dest_square = mv.get_dest();
+                let (row, col) = square_to_row_col(dest_square);
+                
+                let mut index: usize = 0;
+
+                if self.board.piece_on(dest_square).is_some() {
+                    index = 1;
+                }
+
+                ui.put(tiles[row][col], icons[index].clone());
+            }
+        }
+    }
+
 }
 
-pub fn detect_clicked_square(ui: &mut egui::Ui, squares: &[[Rect; 8]; 8]) -> Option<(usize, usize)> {
+pub fn detect_clicked_square(ui: &mut egui::Ui, tiles: &[[Rect; 8]; 8]) -> Option<(usize, usize)> {
 
     let mouse_pos = match ui.input(|i| i.pointer.interact_pos()) {
         Some(pos) => pos,
@@ -115,7 +147,7 @@ pub fn detect_clicked_square(ui: &mut egui::Ui, squares: &[[Rect; 8]; 8]) -> Opt
     if ui.input(|i| i.pointer.primary_pressed()) {
         for row in 0..8 {
             for col in 0..8 {
-                let rect = squares[row][col];
+                let rect = tiles[row][col];
                 
                 if rect.contains(mouse_pos) {
                     return Some((7 - row, col));
@@ -143,17 +175,9 @@ fn piece_to_index(bb_type: &PiecesAndColors) -> usize {
     }
 }
 
-enum PiecesAndColors {
-    WhitePawn,
-    WhiteBishop,
-    WhiteKnight,
-    WhiteRook,
-    WhiteQueen,
-    WhiteKing,
-    BlackPawn,
-    BlackBishop,
-    BlackKnight,
-    BlackRook,
-    BlackQueen,
-    BlackKing
+fn square_to_row_col(square: chess::Square) -> (usize, usize) {
+    let row = square.get_rank().to_index();
+    let col = square.get_file().to_index();
+    (7 - row, col)
 }
+

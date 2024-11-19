@@ -1,12 +1,13 @@
 use chess::{Board, BoardStatus, ChessMove, Color, MoveGen, Piece};
 use std::time::{Duration, Instant};
+use crate::piece_square_tables::{BISHOP_PST, EG_KING_PST, KNIGHT_PST, MG_KING_PST, PAWN_PST, QUEEN_PST, ROOK_PST};
 
 pub fn best_move(
     has_pruning: &bool,
     board: &Board,
     depth: u32,
     maximizing: bool,
-    count: &mut i32,
+    count: &mut i64,
     time_elapsed: &mut Duration,
 ) -> (i32, Option<ChessMove>) {
     let result: (i32, Option<ChessMove>);
@@ -40,11 +41,15 @@ pub fn evaluate_board(board: &Board) -> i32 {
     let mut result = 0;
 
     for square in *board.color_combined(Color::White) {
+        let piece = board.piece_on(square).unwrap();
         result += piece_value(board.piece_on(square).unwrap());
+        result += piece_square_value(board, piece, square, Color::White);
     }
 
     for square in *board.color_combined(Color::Black) {
+        let piece = board.piece_on(square).unwrap();
         result -= piece_value(board.piece_on(square).unwrap());
+        result -= piece_square_value(board, piece, square, Color::Black);
     }
 
     result
@@ -52,19 +57,74 @@ pub fn evaluate_board(board: &Board) -> i32 {
 
 fn piece_value(piece: Piece) -> i32 {
     match piece {
-        Piece::Pawn => 1,
-        Piece::Knight | Piece::Bishop => 3,
-        Piece::Rook => 5,
-        Piece::Queen => 9,
-        Piece::King => 0,
+        Piece::Pawn => 100,
+        Piece::Knight => 320,
+        Piece::Bishop => 330,
+        Piece::Rook => 500,
+        Piece::Queen => 900,
+        Piece::King => 20000,
     }
+}
+
+fn piece_square_value(board: &Board, piece: Piece, square: chess::Square, color: Color) -> i32 {
+    let index = square.to_index();
+    match piece {
+        Piece::Pawn => if color == Color::White { PAWN_PST[index] } else { PAWN_PST[mirror_index(index)] },
+        Piece::Knight => if color == Color::White { KNIGHT_PST[index] } else { KNIGHT_PST[mirror_index(index)] },
+        Piece::Bishop =>  if color == Color::White { BISHOP_PST[index] } else { BISHOP_PST[mirror_index(index)] },
+        Piece::Rook =>  if color == Color::White { ROOK_PST[index] } else { ROOK_PST[mirror_index(index)] },
+        Piece::Queen =>  if color == Color::White { QUEEN_PST[index] } else { QUEEN_PST[mirror_index(index)] },
+        Piece::King =>  {
+
+            if !check_special_endgame(board) {
+                if color == Color::White { 
+                    MG_KING_PST[index] 
+                } else { 
+                    MG_KING_PST[mirror_index(index)] 
+                }
+            } else {
+                if color == Color::White { 
+                    EG_KING_PST[index] 
+                } else { 
+                    EG_KING_PST[mirror_index(index)] 
+                }
+            }      
+        },    
+    }
+}
+
+fn check_special_endgame(board: &Board) -> bool {
+    
+    let white_queens = (board.pieces(Piece::Queen) & board.color_combined(Color::White)).popcnt();
+    let black_queens = (board.pieces(Piece::Queen) & board.color_combined(Color::Black)).popcnt();
+    
+    let white_count = count_pieces(board, Color::White);
+    let black_count = count_pieces(board, Color::Black);
+
+    let white_condition = (white_queens == 0) || (white_queens == 1 && white_count <= 1);
+    let black_condition = (black_queens == 0) || (black_queens == 1 && black_count <= 1);
+
+    white_condition && black_condition
+}
+
+fn count_pieces(board: &Board, color: Color) -> u32 {
+    let bishops = (board.pieces(Piece::Bishop) & board.color_combined(color)).popcnt();
+    let knights = (board.pieces(Piece::Knight) & board.color_combined(color)).popcnt();
+    let rooks = (board.pieces(Piece::Rook) & board.color_combined(color)).popcnt();
+    let queens = (board.pieces(Piece::Queen) & board.color_combined(color)).popcnt();
+    
+    bishops + knights + rooks + queens
+}
+
+fn mirror_index(index: usize) -> usize {
+    63 - index
 }
 
 fn minimax(
     board: &Board,
     depth: u32,
     maximizing: bool,
-    count: &mut i32,
+    count: &mut i64,
 ) -> (i32, Option<ChessMove>) {
     *count += 1;
 
@@ -107,7 +167,7 @@ fn minimax_alpha_beta(
     alpha: i32,
     beta: i32,
     maximizing: bool,
-    count: &mut i32,
+    count: &mut i64,
 ) -> (i32, Option<ChessMove>) {
     *count += 1;
 
