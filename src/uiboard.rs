@@ -3,6 +3,7 @@ use super::ChessApp;
 use chess::{BitBoard, Color, Piece};
 use eframe::egui::{self, Pos2, Rect, Vec2, Color32};
 
+#[derive(PartialEq, Copy, Clone)]
 enum PiecesAndColors {
     WhitePawn,
     WhiteBishop,
@@ -26,6 +27,7 @@ impl ChessApp {
         ui: &mut egui::Ui,
         ctx: &egui::Context,
         board_image: egui::Image<'_>,
+        piece_images: &Vec<egui::Image<'_>>,
         top_panel_height: f32,
     ) -> [[Rect; 8]; 8]  {
         let panel_size = ui.available_size();
@@ -51,6 +53,8 @@ impl ChessApp {
         }        
 
         ui.put(board_rect, board_image);
+
+        self.display_captured(ui, board_upperleft, Pos2::new(board_rect.min.x, board_rect.max.y), piece_images, square_size);
 
         self.draw_evaluation_bar(ctx, ui, Pos2::new(board_upperleft.x + board_size + 5.0, board_upperleft.y), Vec2::new(30.0, board_size));
 
@@ -92,7 +96,113 @@ impl ChessApp {
         }
     }
 
-    pub fn draw_evaluation_bar(&self, ctx: &egui::Context, ui: &mut egui::Ui, position: Pos2, size: Vec2) {
+    fn display_captured(&self, ui: &mut egui::Ui, board_upperleft: Pos2, board_bottomleft: Pos2, piece_images: &Vec<egui::Image<'_>>, square_size: f32) {
+        
+        fn get_priority(piece: &PiecesAndColors) -> usize {
+            match piece {
+                PiecesAndColors::BlackQueen | PiecesAndColors::WhiteQueen  => 0,
+                PiecesAndColors::BlackRook | PiecesAndColors::WhiteRook => 1,
+                PiecesAndColors::BlackBishop | PiecesAndColors::WhiteBishop => 2,
+                PiecesAndColors::BlackKnight | PiecesAndColors::WhiteKnight => 3,
+                PiecesAndColors::BlackPawn | PiecesAndColors::WhitePawn=> 4,
+                _ => 5,
+            }
+        }
+
+        let icon_size = square_size/2.0;
+        let origin_top: Pos2 = Pos2::new(board_upperleft.x, board_upperleft.y - icon_size);
+        let origin_bottom: Pos2 = board_bottomleft;
+        let mut top_pieces: Vec<PiecesAndColors> = Vec::new();
+        let mut bottom_pieces: Vec<PiecesAndColors> = Vec::new();
+
+        for piece in self.white_slain_pieces.clone() {
+            
+            let piece_and_color = match piece {
+                Piece::Pawn => PiecesAndColors::WhitePawn,
+                Piece::Knight => PiecesAndColors::WhiteKnight,
+                Piece::Bishop => PiecesAndColors::WhiteBishop,
+                Piece::Rook => PiecesAndColors::WhiteRook,
+                Piece::Queen => PiecesAndColors::WhiteQueen,
+                Piece::King => PiecesAndColors::WhiteKing
+            };
+
+            let priority = get_priority(&piece_and_color);
+            let mut inserted = false;
+
+            for i in 0..top_pieces.len() {
+                if get_priority(&top_pieces[i]) > priority {
+                    top_pieces.insert(i, piece_and_color);
+                    inserted = true;
+                    break;
+                }
+            }
+            
+            if !inserted {
+                top_pieces.push(piece_and_color);
+            }
+        }
+
+        for piece in self.black_slain_pieces.clone() {
+            let piece_and_color = match piece {
+                Piece::Pawn => PiecesAndColors::BlackPawn,
+                Piece::Knight => PiecesAndColors::BlackKnight,
+                Piece::Bishop => PiecesAndColors::BlackBishop,
+                Piece::Rook => PiecesAndColors::BlackRook,
+                Piece::Queen => PiecesAndColors::BlackQueen,
+                Piece::King => PiecesAndColors::BlackKing
+            };
+
+            let priority = get_priority(&piece_and_color);
+            let mut inserted = false;
+
+            for i in 0..bottom_pieces.len() {
+                if get_priority(&bottom_pieces[i]) > priority {
+                    bottom_pieces.insert(i, piece_and_color);
+                    inserted = true;
+                    break;
+                }
+            }
+            
+            if !inserted {
+                bottom_pieces.push(piece_and_color);
+            }
+        }
+
+        for (i, piece) in top_pieces.into_iter().enumerate() {
+            ui.put(
+                Rect::from_min_size(
+                    Pos2::new(
+                        origin_top.x + (i as f32 * icon_size),
+                        origin_top.y
+                    ),
+                    Vec2::new(
+                        icon_size,
+                        icon_size
+                    )
+                ), 
+                piece_images[piece_to_index(&piece)].clone()
+            );
+        }
+
+        for (i, piece) in bottom_pieces.into_iter().enumerate() {
+            ui.put(
+                Rect::from_min_size(
+                    Pos2::new(
+                        origin_bottom.x + (i as f32 * icon_size),
+                        origin_bottom.y
+                    ),
+                    Vec2::new(
+                        icon_size,
+                        icon_size
+                    )
+                ), 
+                piece_images[piece_to_index(&piece)].clone()
+            );
+        }
+
+    }
+
+    fn draw_evaluation_bar(&self, ctx: &egui::Context, ui: &mut egui::Ui, position: Pos2, size: Vec2) {
        
         let evaluation = best_move::evaluate_board(&self.board);
 

@@ -90,8 +90,6 @@ impl ChessApp {
                             self.black_slain_pieces.push(self.board.piece_on(clicked_square).unwrap());
                         } 
 
-                        println!("dead white: {:#?}\ndead black: {:#?}", self.white_slain_pieces, self.black_slain_pieces);
-
                         self.board = self.board.make_move_new(possible_move);
                         self.turn_state = TurnStates::OpponentMoves;
                     } else {

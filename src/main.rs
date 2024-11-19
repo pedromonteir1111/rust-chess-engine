@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 mod best_move;
 mod uiboard;
 mod action_manager;
@@ -117,6 +119,8 @@ impl eframe::App for ChessApp {
                             .clamp_range(RangeInclusive::new(1, 7)),
                     );
                 });
+                ui.label(RichText::new(r"                                          /\ /\ /\ /\ /\").font(FontId::proportional(8.0)));
+                ui.label(RichText::new("  (warning!! don't put it too high!)\n").font(FontId::proportional(12.0)).italics());
 
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("alpha-beta:").font(FontId::proportional(25.0)));
@@ -171,6 +175,7 @@ impl eframe::App for ChessApp {
                 ui,
                 ctx,
                 image,
+                &pieces,
                 top_panel_height
             );
 

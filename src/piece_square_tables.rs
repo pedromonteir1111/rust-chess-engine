@@ -1,3 +1,5 @@
+// values taken from: https://www.chessprogramming.org/Simplified_Evaluation_Function
+
 pub const PAWN_PST: [i32; 64] = [
     0,  0,  0,  0,  0,  0,  0,  0,
     50, 50, 50, 50, 50, 50, 50, 50,
